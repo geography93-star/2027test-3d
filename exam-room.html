@@ -1037,15 +1037,20 @@ body{
   claim('aux',m0);
 
   /* ---------- 여분 책·걸상: 교실 창문 쪽 복도에 정리 (의자는 뒤집어 책상 위) ---------- */
+  // 복도 통로를 넓게 쓰도록 책상의 긴 쪽(65 cm)을 교실 벽(복도 창가)에 붙여 한 줄로 정리
+  // 의자는 뒤집어 올리고 등받이는 복도 쪽 가장자리로 걸침
   function storedDesk(x,z){
     const g=new THREE.Group(); g.position.set(x,0,z); scene.add(g);
-    g.add(deskT.clone());
-    const ch=chairT.clone(); ch.rotation.set(Math.PI,Math.PI/2,0); ch.position.set(-0.15,0.72+0.441,0);
-    g.add(ch);
+    const d=deskT.clone(); d.rotation.y=Math.PI/2; g.add(d);
+    const holder=new THREE.Group(); holder.rotation.y=-Math.PI/2; holder.position.set(0.06,0.72+0.441,0); g.add(holder);
+    const ch=chairT.clone(); ch.rotation.x=Math.PI; holder.add(ch);
   }
-  const HALL_X0=RX+T+0.04+0.325, HALL_Z0=doorZ[0]+DOOR_W/2+0.05;   // 앞문 바로 뒤부터
+  const HALL_X0=RX+T+0.04+0.25;                       // 벽에서 4 cm 띄우고 깊이 50 cm만 복도로
+  const HALL_Z0=doorZ[0]+DOOR_W/2+0.03;               // 앞문 바로 뒤부터
+  const HC_Z0=PIL_Z+(0.9+0.05+0.6)/2, HC_START=HC_Z0-(0.9+0.05+0.6), HTR_END=HC_Z0+0.05+0.4;  // 청소함·쓰레기통 자리
   m0=mark();
-  for(let r=0;r<2;r++) for(let i=0;i<2;i++) storedDesk(HALL_X0+r*0.67, HALL_Z0+0.265+i*0.53);
+  for(let i=0;i<3;i++) storedDesk(HALL_X0, HALL_Z0+0.325+i*0.65);   // 앞문 ~ 분리수거함 앞: 3개
+  storedDesk(HALL_X0, HTR_END+0.03+0.325);                          // 쓰레기통 옆 ~ 뒷문 앞: 1개
   claim('spareHall',m0);
 
   /* ---------- 벽걸이 선풍기 4대 (앞벽 양쪽 모서리 + 양쪽 기둥), 전원 코드·콘센트 포함 ---------- */
@@ -1269,7 +1274,7 @@ body{
     stool:[[0.32,1.15,STOOL_Z]],
     eboard:[[0,2.3,FZ+0.2]],
     heater:HEATERS.map(([x,z])=>[x,H-0.25,z]),
-    spareHall:[[HALL_X0+0.33,1.75,HALL_Z0+0.53]],
+    spareHall:[[HALL_X0,1.6,HALL_Z0+0.98]],
     aux:[[AUX_X,1.0,tz],[(COLS.A+COLS.B)/2,0.95,rowZ(5)+0.15],[(COLS.D+COLS.E)/2,0.95,rowZ(5)+0.15]],
     lockers:[[LK_X-1.6,1.25,LK_FACE-0.15]],
     cleaning:[CLEAN_PIN],
@@ -1349,8 +1354,12 @@ body{
     p.textContent='모든 항목을 점검했습니다.'; listEl.append(p);
   }
 
+  // 분야를 다 체크하면 자동으로 접고, 다음에 할 분야로 목록을 옮겨 줌
+  var catState=null;
+  function setCatOpen(sec,open){ sec.classList.toggle('closed',!open); sec.querySelector('.cat-h').setAttribute('aria-expanded',String(open)); }
   function render(){
     recompute();
+    const firstRender=catState===null, nowComplete={}; let justDone=null;
     const n=done.size, total=ITEMS.length;
     $('p-done').textContent=n; $('p-total').textContent=total;
     const left=$('p-left'); left.textContent=n===total?'모두 완료':`남은 ${total-n}개`; left.classList.toggle('ok',n===total);
@@ -1362,12 +1371,24 @@ body{
       sec.querySelector('.cat-count').textContent=d===its.length?`✓ ${d}/${its.length}`:`${d}/${its.length}`;
       sec.classList.toggle('complete',d===its.length);
       sec.hidden=only && d===its.length;
+      const comp=d===its.length; nowComplete[cat.id]=comp;
+      if(firstRender){ setCatOpen(sec,!comp); }
+      else if(comp && !catState[cat.id]){ setCatOpen(sec,false); if(!justDone) justDone=cat.id; }
+      else if(!comp && catState[cat.id]){ setCatOpen(sec,true); }
       its.forEach(i=>{
         const li=sec.querySelector(`[data-id="${i.id}"]`), on=done.has(i.id);
         li.classList.toggle('done',on); li.hidden=only&&on; li.querySelector('input').checked=on;
       });
     });
     $('all-done').hidden=!(n===total);
+    catState=nowComplete;
+    if(justDone){
+      const order=CATS.map(c=>c.id), from=order.indexOf(justDone);
+      const next=order.slice(from+1).concat(order.slice(0,from)).find(id=>!nowComplete[id]);
+      const target=next?listEl.querySelector(`[data-cat="${next}"]`):$('submit');
+      if(next) setCatOpen(target,true);
+      requestAnimationFrame(()=>target.scrollIntoView({block:next?'start':'end',behavior:reduceMotion()?'auto':'smooth'}));
+    }
     updatePins();
     if(typeof drawEbPanel==='function' && ebOn) drawEbPanel();
     if(typeof updateSubmit==='function') updateSubmit();
@@ -1670,18 +1691,20 @@ body{
   const GATE_HASH='5lib8';
   const gateHash=s=>{ let x=2166136261; for(const c of 'exam-gate:'+s){ x^=c.codePointAt(0); x=Math.imul(x,16777619)>>>0; } return x.toString(36); };
   const gate=$('gate'), gClass=$('gate-class'), gPw=$('gate-pw'), gErr=$('gate-err');
-  let gatePw=''; try{ gatePw=sessionStorage.getItem('exam-gate-pw')||''; }catch(e){}
+  // 페이지(일반시험실·별도시험실·관리본부)마다 따로 입장 → 다른 페이지로 가면 다시 학년-반·비밀번호를 물음
+  const K_ROOM='exam-gate-room:'+STORE, K_PW='exam-gate-pw:'+STORE, K_LAST='exam-last-room:'+STORE;
+  let gatePw=''; try{ gatePw=sessionStorage.getItem(K_PW)||''; }catch(e){}
   $('gate-title').textContent=pageTitle;
   const normClass=v=>{ const m=String(v).replace(/[\s]/g,'').replace(/[–—_.·]/g,'-').match(/^([1-3])-?(\d{1,2})$/); return m?`${m[1]}-${Number(m[2])}`:null; };
   function openRoom(id){
-    roomId=id; loadDone(); render(); applyBoardState();
+    roomId=id; loadDone(); catState=null; render(); applyBoardState();
     const tag=$('room-tag'); tag.textContent=`${id}반`; tag.hidden=false;
     gate.hidden=true;
-    try{ sessionStorage.setItem('exam-gate-room',id); localStorage.setItem('exam-last-room',id); }catch(e){}
+    try{ sessionStorage.setItem(K_ROOM,id); localStorage.setItem(K_LAST,id); }catch(e){}
   }
   function lock(){
     closePop(); gPw.value=''; gErr.textContent=''; gClass.removeAttribute('aria-invalid'); gPw.removeAttribute('aria-invalid');
-    gatePw=''; try{ sessionStorage.removeItem('exam-gate-room'); sessionStorage.removeItem('exam-gate-pw'); }catch(e){}
+    gatePw=''; try{ sessionStorage.removeItem(K_ROOM); sessionStorage.removeItem(K_PW); }catch(e){}
     gate.hidden=false; (gClass.value?gPw:gClass).focus();
   }
   $('gate-form').addEventListener('submit',e=>{
@@ -1693,13 +1716,18 @@ body{
       gPw.setAttribute('aria-invalid','true'); gErr.textContent='비밀번호가 맞지 않아요. 다시 입력해 주세요.';
       gPw.value=''; gPw.focus(); return;
     }
-    gatePw=gPw.value.trim(); try{ sessionStorage.setItem('exam-gate-pw',gatePw); }catch(e){}
+    gatePw=gPw.value.trim(); try{ sessionStorage.setItem(K_PW,gatePw); }catch(e){}
     gClass.value=id; openRoom(id);
   });
   $('lock').addEventListener('click',lock);
-  try{ gClass.value=localStorage.getItem('exam-last-room')||''; }catch(e){}
-  let resumed=null; try{ resumed=sessionStorage.getItem('exam-gate-room'); }catch(e){}
+  try{ gClass.value=localStorage.getItem(K_LAST)||''; }catch(e){}
+  let resumed=null; try{ resumed=sessionStorage.getItem(K_ROOM); }catch(e){}
   if(resumed && normClass(resumed)) openRoom(normClass(resumed)); else lock();
+  window.addEventListener('pageshow',e=>{
+    if(!e.persisted) return;
+    let r=null; try{ r=sessionStorage.getItem(K_ROOM); }catch(_){}
+    if(!r) lock();
+  });
 
   // 미완료 물건 주황 깜빡임, 체크 직후 초록 반짝임
   const tmpC=new THREE.Color(), addC=new THREE.Color();
