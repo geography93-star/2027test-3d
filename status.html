@@ -1,0 +1,286 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>시험실 점검 현황</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: sticky header with summary, then one card grid per 구분 (일반시험실 · 별도시험실 · 관리본부) */
+:root{
+  --bg:#eef2f0;
+  --surface:#ffffff;
+  --line:rgba(28,52,40,.13);
+  --fg:#1c2a23;
+  --muted:#5a6a62;
+  --accent:#2f6b4f;
+  --accent-fg:#ffffff;
+  --accent-bg:rgba(47,107,79,.10);
+  --warn:#b85a00;
+  --warn-bg:rgba(230,120,10,.12);
+  --note:#8a5a00;
+  --note-bg:#fff4dc;
+  --btn:rgba(28,52,40,.06);
+  --font:'IBM Plex Sans KR',system-ui,-apple-system,'Apple SD Gothic Neo','Malgun Gothic',sans-serif;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#151a17;--surface:#1e2622;--line:rgba(220,235,226,.13);--fg:#e6eee9;--muted:#9fb0a7;
+    --accent:#5fae86;--accent-fg:#0f1a14;--accent-bg:rgba(95,174,134,.14);--warn:#f0a24a;--warn-bg:rgba(240,162,74,.14);
+    --note:#f2c46b;--note-bg:rgba(242,196,107,.12);--btn:rgba(220,235,226,.07);
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#151a17;--surface:#1e2622;--line:rgba(220,235,226,.13);--fg:#e6eee9;--muted:#9fb0a7;
+  --accent:#5fae86;--accent-fg:#0f1a14;--accent-bg:rgba(95,174,134,.14);--warn:#f0a24a;--warn-bg:rgba(240,162,74,.14);
+  --note:#f2c46b;--note-bg:rgba(242,196,107,.12);--btn:rgba(220,235,226,.07);
+  color-scheme:dark;
+}
+*,*::before,*::after{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{margin:0}
+body{
+  background:var(--bg);color:var(--fg);font-family:var(--font);font-size:14px;line-height:1.5;
+  padding-left:max(16px, env(safe-area-inset-left, 0px));padding-right:max(16px, env(safe-area-inset-right, 0px));
+  padding-block:0 calc(32px + env(safe-area-inset-bottom, 0px));
+}
+.wrap{max-width:1180px;margin:0 auto}
+header{
+  position:sticky;top:env(safe-area-inset-top, 0px);z-index:5;background:var(--bg);
+  padding-block:18px 14px;border-bottom:1px solid var(--line);display:grid;gap:14px
+}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top, 0px);z-index:10;background:var(--bg)}
+.top{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;flex-wrap:wrap}
+h1{margin:0;font-size:24px;font-weight:700;letter-spacing:-.02em}
+.when{margin:2px 0 0;font-size:12.5px;color:var(--muted);font-variant-numeric:tabular-nums}
+.actions{display:flex;gap:8px}
+.btn{
+  border:1px solid var(--line);background:var(--surface);color:var(--fg);
+  font:600 13px var(--font);border-radius:9px;padding:8px 12px;cursor:pointer
+}
+.btn:hover{border-color:var(--accent)}
+.btn:focus-visible,.chip:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.btn:disabled{opacity:.6;cursor:progress}
+
+.tiles{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+.tile{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:10px 14px;min-width:0}
+.tile b{display:block;font-size:26px;font-weight:700;letter-spacing:-.02em;font-variant-numeric:tabular-nums;line-height:1.2}
+.tile span{font-size:12px;color:var(--muted)}
+.tile.ok b{color:var(--accent)}
+.tile.wait b{color:var(--warn)}
+.tile.note b{color:var(--note)}
+.bar{grid-column:1/-1;height:6px;background:var(--line);border-radius:3px;overflow:hidden}
+.bar i{display:block;height:100%;width:0;background:var(--accent);transition:width .4s}
+
+.filters{display:flex;gap:6px;flex-wrap:wrap}
+.chip{
+  border:1px solid var(--line);background:var(--surface);color:var(--fg);
+  font:600 12.5px var(--font);border-radius:999px;padding:6px 12px;cursor:pointer;font-variant-numeric:tabular-nums
+}
+.chip[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--accent-fg)}
+
+main{display:grid;gap:26px;padding-top:20px}
+.group h2{margin:0 0 10px;font-size:15px;font-weight:700;display:flex;align-items:baseline;gap:8px}
+.group h2 small{font-size:12.5px;font-weight:600;color:var(--muted);font-variant-numeric:tabular-nums}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;align-items:start}
+.card{
+  background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px 14px 12px;
+  display:grid;gap:6px;align-content:start;min-width:0;border-left:4px solid var(--warn)
+}
+.card.ok{border-left-color:var(--accent)}
+.card-top{display:flex;align-items:center;justify-content:space-between;gap:4px 8px;flex-wrap:wrap}
+.room{white-space:nowrap;font-size:22px;font-weight:700;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+.room small{font-size:13px;font-weight:600;color:var(--muted);margin-left:1px}
+.pill{font-size:11.5px;font-weight:700;border-radius:999px;padding:2px 9px;white-space:nowrap;background:var(--warn-bg);color:var(--warn)}
+.card.ok .pill{background:var(--accent-bg);color:var(--accent)}
+.meta{font-size:12.5px;color:var(--muted);font-variant-numeric:tabular-nums}
+.meta b{color:var(--fg);font-weight:600}
+.memo{font-size:12px;color:var(--muted)}
+.card-note{font-size:12.5px;line-height:1.45;background:var(--note-bg);color:var(--fg);border-radius:8px;padding:6px 9px;overflow-wrap:anywhere}
+.card-note::before{content:"비고  ";font-weight:700;color:var(--note)}
+.empty{background:var(--surface);border:1px dashed var(--line);border-radius:12px;padding:18px;color:var(--muted);font-size:13.5px;line-height:1.6}
+.empty b{color:var(--fg)}
+.err{color:var(--warn);font-weight:600}
+
+/* 비밀번호 */
+.gate{position:fixed;inset:0;z-index:50;display:grid;place-items:center;background:var(--bg);
+  padding-left:max(16px, env(safe-area-inset-left, 0px));padding-right:max(16px, env(safe-area-inset-right, 0px))}
+.gate form{width:min(360px,100%);background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:24px 22px 20px;display:grid;gap:14px;box-shadow:0 10px 30px rgba(10,25,18,.12)}
+.gate h2{margin:0;font-size:20px}
+.gate p{margin:0;font-size:13px;color:var(--muted)}
+.gate label{font-size:12.5px;font-weight:600;color:var(--muted)}
+.gate input{font:500 18px var(--font);color:var(--fg);background:var(--surface);border:1.5px solid var(--line);border-radius:10px;padding:11px 12px;width:100%;margin-top:6px}
+.gate input:focus-visible{outline:none;border-color:var(--accent)}
+.gate .go{border:0;border-radius:10px;background:var(--accent);color:var(--accent-fg);font:700 15px var(--font);padding:12px;cursor:pointer}
+.gate .go:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+.gate .msg{min-height:1.2em;font-size:12.5px;font-weight:600;color:var(--warn)}
+
+@media (max-width:640px){
+  .tiles{grid-template-columns:repeat(2,minmax(0,1fr))}
+  h1{font-size:21px}
+  .grid{grid-template-columns:repeat(auto-fill,minmax(150px,1fr))}
+}
+@media (prefers-reduced-motion: reduce){ .bar i{transition:none} }
+</style>
+</head>
+<body>
+
+<div class="gate" id="gate">
+  <form id="gate-form" autocomplete="off">
+    <h2>시험실 점검 현황</h2>
+    <p>관리 담당 비밀번호를 입력하세요.</p>
+    <label for="pw">비밀번호<input id="pw" name="pw" type="password" inputmode="numeric" placeholder="숫자 4자리" required></label>
+    <p class="msg" id="gate-msg" role="alert"></p>
+    <button type="submit" class="go">현황 보기</button>
+  </form>
+</div>
+
+<div class="wrap">
+  <header>
+    <div class="top">
+      <div>
+        <h1>시험실 점검 현황</h1>
+        <p class="when" id="when">불러오는 중…</p>
+      </div>
+      <div class="actions">
+        <button type="button" class="btn" id="refresh">새로고침</button>
+      </div>
+    </div>
+    <div class="tiles">
+      <div class="tile ok"><b id="t-done">0</b><span>점검 완료</span></div>
+      <div class="tile wait"><b id="t-wait">0</b><span>미제출</span></div>
+      <div class="tile note"><b id="t-note">0</b><span>비고 있음</span></div>
+      <div class="tile"><b id="t-total">0</b><span>전체 시험실</span></div>
+      <div class="bar" role="progressbar" aria-label="점검 완료 비율" aria-valuemin="0" aria-valuemax="100" id="barwrap"><i id="bar"></i></div>
+    </div>
+    <div class="filters" id="filters">
+      <button type="button" class="chip" id="f-all" data-f="all" aria-pressed="true">전체</button>
+      <button type="button" class="chip" id="f-wait" data-f="wait" aria-pressed="false">미제출만</button>
+      <button type="button" class="chip" id="f-note" data-f="note" aria-pressed="false">비고 있음</button>
+    </div>
+  </header>
+  <main id="main"></main>
+</div>
+
+<script>
+(function(){
+  // ▼ 구글 앱스크립트 웹앱 주소 (3D 점검표 파일들과 같은 주소)
+  const REPORT_URL='https://script.google.com/macros/s/AKfycbxhR51hH5tkUs21N0sZlb2Vc22fyFzz31vKDd3MPzXlR4r7BI6iNViYBz-k_NyQPEzB/exec';
+  const TYPES=['일반시험실','별도시험실','관리본부'];
+  const $=id=>document.getElementById(id);
+  let pw='', data=null, filter='all', timer=null;
+  try{ pw=sessionStorage.getItem('exam-dash-pw')||''; }catch(e){}
+
+  const roomKey=r=>{ const m=String(r).match(/^(\d)-(\d+)$/); return m?(+m[1])*100+(+m[2]):9999; };
+  const fmt=iso=>{ if(!iso) return ''; const d=new Date(iso); if(isNaN(d)) return iso;
+    return `${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`; };
+  const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+  async function load(){
+    if(!REPORT_URL){ showEmpty('setup'); return; }
+    const btn=$('refresh'); btn.disabled=true; btn.textContent='불러오는 중…';
+    try{
+      const res=await fetch(REPORT_URL+(REPORT_URL.includes('?')?'&':'?')+'pw='+encodeURIComponent(pw)+'&t='+Date.now());
+      const j=await res.json();
+      if(!j.ok){
+        if(/비밀번호/.test(j.error||'')){ pw=''; try{ sessionStorage.removeItem('exam-dash-pw'); }catch(e){} openGate(j.error); return; }
+        throw new Error(j.error);
+      }
+      data=j; draw();
+      $('when').textContent=`${fmt(j.now)} 기준 · 1분마다 자동으로 새로고침`;
+    }catch(e){
+      $('when').innerHTML='<span class="err">불러오지 못했어요. 인터넷 연결을 확인하고 새로고침을 눌러 주세요.</span>';
+    }finally{ btn.disabled=false; btn.textContent='새로고침'; }
+  }
+
+  function merge(){
+    // 시험실목록(대상)과 점검결과(제출)를 합쳐 한 목록으로
+    const map=new Map();
+    (data.roster||[]).forEach(r=>map.set(r.type+'|'+r.room,{type:r.type,room:r.room,memo:r.memo,res:null}));
+    (data.results||[]).forEach(r=>{
+      const k=r.type+'|'+r.room, cur=map.get(k)||{type:r.type,room:r.room,memo:'',res:null};
+      cur.res=r; map.set(k,cur);
+    });
+    return [...map.values()];
+  }
+
+  function draw(){
+    const all=merge();
+    const doneN=all.filter(x=>x.res).length, noteN=all.filter(x=>x.res&&x.res.note).length;
+    $('t-done').textContent=doneN; $('t-wait').textContent=all.length-doneN;
+    $('t-note').textContent=noteN; $('t-total').textContent=all.length;
+    const pct=all.length?Math.round(doneN/all.length*100):0;
+    $('bar').style.width=pct+'%'; $('barwrap').setAttribute('aria-valuenow',String(pct));
+    $('f-wait').textContent=`미제출만 ${all.length-doneN}`; $('f-note').textContent=`비고 있음 ${noteN}`;
+
+    const main=$('main'); main.textContent='';
+    if(!all.length){ showEmpty('nodata'); return; }
+    const shown=all.filter(x=> filter==='all' || (filter==='wait'&&!x.res) || (filter==='note'&&x.res&&x.res.note));
+    const types=[...TYPES, ...new Set(all.map(x=>x.type).filter(t=>!TYPES.includes(t)))];
+    let any=false;
+    types.forEach(t=>{
+      const list=shown.filter(x=>x.type===t).sort((a,b)=>roomKey(a.room)-roomKey(b.room));
+      if(!list.length) return; any=true;
+      const tot=all.filter(x=>x.type===t), d=tot.filter(x=>x.res).length;
+      const sec=document.createElement('section'); sec.className='group';
+      sec.innerHTML=`<h2>${esc(t)} <small>${d} / ${tot.length} 완료</small></h2><div class="grid"></div>`;
+      const grid=sec.querySelector('.grid');
+      list.forEach(x=>{
+        const c=document.createElement('article'); c.className='card'+(x.res?' ok':'');
+        const r=x.res;
+        c.innerHTML=`
+          <div class="card-top"><span class="room">${esc(x.room)}<small>반</small></span>
+            <span class="pill">${r?'완료 '+esc(fmt(r.at)):'미제출'}</span></div>
+          ${r?`<div class="meta">담임 <b>${esc(r.teacher)}</b>${r.count>1?` · ${r.count}번째 제출`:''}</div>`:''}
+          ${x.memo?`<div class="memo">${esc(x.memo)}</div>`:''}
+          ${r&&r.note?`<div class="card-note">${esc(r.note)}</div>`:''}`;
+        grid.append(c);
+      });
+      main.append(sec);
+    });
+    if(!any){
+      const p=document.createElement('p'); p.className='empty';
+      p.textContent=filter==='wait'?'미제출 시험실이 없어요. 모두 제출했습니다.':'비고가 적힌 시험실이 없어요.';
+      main.append(p);
+    }
+    if(!(data.roster||[]).length){
+      const p=document.createElement('p'); p.className='empty';
+      p.innerHTML='구글 시트의 <b>[시험실목록]</b>에 구분(일반시험실·별도시험실·관리본부)과 학년-반을 적어 두면, 아직 제출하지 않은 시험실도 <b>미제출</b>로 함께 보여요.';
+      main.append(p);
+    }
+  }
+
+  function showEmpty(kind){
+    const main=$('main');
+    main.innerHTML= kind==='setup'
+      ? '<p class="empty"><b>아직 앱스크립트 주소가 연결되지 않았어요.</b><br>이 파일의 <b>REPORT_URL</b>에 배포한 웹 앱 주소(…/exec)를 붙여넣으면 전체 시험실 현황이 여기에 나타나요.</p>'
+      : '<p class="empty"><b>아직 제출된 시험실이 없어요.</b><br>각 반에서 3D 점검표의 모든 항목을 체크하고 <b>점검 완료 제출</b>을 누르면 여기에 카드가 생겨요.</p>';
+    $('when').textContent=kind==='setup'?'연결 필요':'제출 대기 중';
+  }
+
+  $('filters').addEventListener('click',e=>{
+    const b=e.target.closest('button'); if(!b) return;
+    filter=b.dataset.f; $('filters').querySelectorAll('button').forEach(x=>x.setAttribute('aria-pressed',String(x===b)));
+    if(data) draw();
+  });
+  $('refresh').addEventListener('click',load);
+
+  function openGate(msg){ $('gate').hidden=false; $('gate-msg').textContent=msg||''; $('pw').value=''; $('pw').focus(); }
+  $('gate-form').addEventListener('submit',e=>{
+    e.preventDefault();
+    pw=$('pw').value.trim(); if(!pw) return;
+    try{ sessionStorage.setItem('exam-dash-pw',pw); }catch(e){}
+    $('gate').hidden=true; start();
+  });
+  function start(){ load(); clearInterval(timer); timer=setInterval(()=>{ if(!document.hidden) load(); },60000); }
+
+  if(!REPORT_URL){ $('gate').hidden=true; showEmpty('setup'); }
+  else if(pw){ $('gate').hidden=true; start(); }
+  else openGate();
+})();
+</script>
+</body>
+</html>
